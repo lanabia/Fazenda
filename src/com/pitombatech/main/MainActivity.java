@@ -1,4 +1,6 @@
-package com.ifce.activity;
+package com.pitombatech.main;
+
+import com.pitombatech.main.R;
 
 import android.app.Activity;
 import android.os.Bundle;
