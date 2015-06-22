@@ -1,0 +1,11 @@
+<resources>
+
+    <string name="app_name">Fazenda</string>
+    <string name="a">A</string>
+    <string name="r">R</string>
+    <string name="l">L</string>
+    <string name="o">O</string>
+    <string name="s">S</string>
+    <string name="info">Clique na tela!</string>
+
+</resources>
