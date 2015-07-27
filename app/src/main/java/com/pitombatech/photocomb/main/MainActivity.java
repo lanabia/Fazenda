@@ -84,7 +84,6 @@ public class MainActivity extends Activity implements OnClickListener {
         // does not working
         anim.anima(v, list);
         Log.d("Lana", "Clicando Anim");
-
     }
 
 }

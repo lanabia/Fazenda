@@ -4,9 +4,13 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.drawable.Drawable;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
+
+import math.geom2d.Point2D;
+import math.geom2d.Vector2D;
 
 import com.pitombatech.photocomb.R;
 
@@ -26,7 +30,12 @@ public class BackImage extends View {
     private float mLastTouchY;
     private int mActivePointerId = INVALID_POINTER_ID;
 
-    private ScaleGestureDetector mScaleDetector;
+    private float mAngle;
+    private float mLastAngle;
+    private float[] mFirstDoubleTouchPointer;
+
+    private ScaleGestureDetector mScaleDetector; // listener scale movement
+
     private float mScaleFactor = 1.f;
 
     public BackImage(Context context) {
@@ -42,15 +51,19 @@ public class BackImage extends View {
         mIcon = context.getResources().getDrawable(R.drawable.a);
         mIcon.setBounds(0, 0, mIcon.getIntrinsicWidth(), mIcon.getIntrinsicHeight());
 
+        mFirstDoubleTouchPointer = new float[]{0f, 0f, 100f, 0f};
+
         mScaleDetector = new ScaleGestureDetector(context, new ScaleListener());
     }
 
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
+
+
         // Let the ScaleGestureDetector inspect all events.
         mScaleDetector.onTouchEvent(ev);
-
         final int action = ev.getAction();
+
         switch (action & MotionEvent.ACTION_MASK) {
             case MotionEvent.ACTION_DOWN: {
                 final float x = ev.getX();
@@ -58,7 +71,16 @@ public class BackImage extends View {
 
                 mLastTouchX = x;
                 mLastTouchY = y;
+
                 mActivePointerId = ev.getPointerId(0);
+                break;
+            }
+
+            case MotionEvent.ACTION_POINTER_DOWN: {
+                if (twoTouch(ev)) {
+                    mFirstDoubleTouchPointer = new float[]{ev.getX(0), ev.getY(0), ev.getX(1), ev.getY(1)};
+                    Log.d("Lana", "mFirstDoubleTouchPointerX: " + mFirstDoubleTouchPointer[0] + " " + mFirstDoubleTouchPointer[1] + " " + mFirstDoubleTouchPointer[2] + " " + mFirstDoubleTouchPointer[3] + " ");
+                }
                 break;
             }
 
@@ -67,11 +89,11 @@ public class BackImage extends View {
                 final float x = ev.getX(pointerIndex);
                 final float y = ev.getY(pointerIndex);
 
-                // Only move if the ScaleGestureDetector isn't processing a gesture.
-                if (!mScaleDetector.isInProgress()) {
-                    final float dx = x - mLastTouchX;
-                    final float dy = y - mLastTouchY;
+                final float dx = x - mLastTouchX;
+                final float dy = y - mLastTouchY;
 
+                // Only move if the ScaleGestureDetector isn't processing a gesture.
+                if (!mScaleDetector.isInProgress() && !twoTouch(ev)) {
                     mPosX += dx;
                     mPosY += dy;
 
@@ -80,6 +102,14 @@ public class BackImage extends View {
 
                 mLastTouchX = x;
                 mLastTouchY = y;
+
+                // to get angle of rotation
+                if (twoTouch(ev)) {
+                    mAngle = Math.abs(getAngle(ev)) > 1 ? (getAngle(ev)) : 0;
+                    Log.d("Lana", "Angle: " + mAngle);
+
+                    invalidate();
+                }
 
                 break;
             }
@@ -106,6 +136,10 @@ public class BackImage extends View {
                     mLastTouchY = ev.getY(newPointerIndex);
                     mActivePointerId = ev.getPointerId(newPointerIndex);
                 }
+                if (twoTouch(ev)) {
+                    mLastAngle = getAngle(ev);
+                    Log.d("Lana", "LastAngle: " + mLastAngle);
+                }
                 break;
             }
         }
@@ -117,9 +151,12 @@ public class BackImage extends View {
     public void onDraw(Canvas canvas) {
         super.onDraw(canvas);
 
+        //Log.d("Lana","Redraw");
+
         canvas.save();
         canvas.translate(mPosX, mPosY);
         canvas.scale(mScaleFactor, mScaleFactor);
+        canvas.rotate(mAngle, canvas.getWidth() / 2, canvas.getHeight() / 2);
         mIcon.draw(canvas);
         canvas.restore();
     }
@@ -135,5 +172,60 @@ public class BackImage extends View {
             invalidate();
             return true;
         }
+    }
+
+    /**
+     * Determine the degree between the first two fingers
+     */
+    private float getAngle(MotionEvent event) {
+        float angle = 0f;
+        double radians = 0f;
+
+        double x1_p = event.getX(1);
+        double x0_p = event.getX(0);
+        double y1_p = event.getY(1);
+        double y0_p = event.getY(0);
+
+        double x1_i = mFirstDoubleTouchPointer[2];
+        double x0_i = mFirstDoubleTouchPointer[0];
+        double y1_i = mFirstDoubleTouchPointer[3];
+        double y0_i = mFirstDoubleTouchPointer[1];
+
+        // Last solution (arcTan to describe the angle)
+        //double aPos = x1_p - x0_p;
+        //double bPos = y1_p - y0_p;
+        //double aInicial = x1_i - x0_i;
+        //double bInicial = y1_i - y0_i;
+        //double radians = Math.atan((bInicial * aPos - bPos * aInicial) / (aInicial * aPos + bInicial * bPos));
+
+
+        Point2D i0 = new Point2D(x0_i, y0_i);
+        Point2D i1 = new Point2D(x1_i, y1_i);
+        Point2D p0 = new Point2D(x0_p, y0_p);
+        Point2D p1 = new Point2D(x1_p, y1_p);
+
+        Vector2D v_i = new Vector2D(i1, i0);
+        Vector2D v_p = new Vector2D(p1, p0);
+
+        radians = v_p.angle() - v_i.angle();
+
+        angle = (float) Math.toDegrees(radians) + mLastAngle;
+
+        if (angle > 360)
+            angle = angle - 360;
+        else if (angle < -360)
+            angle = angle + 360;
+
+        return angle;
+    }
+
+    /**
+     * To get twoTouch gesture on the screen
+     *
+     * @param event
+     * @return true if it has occured a two touch gesture on screen
+     */
+    private boolean twoTouch(MotionEvent event) {
+        return (event.getPointerCount() == 2) ? true : false;
     }
 }
